@@ -1,13 +1,15 @@
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from pathlib import Path
-from typing import Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from src.config import BotSettings, load_settings
 from src.news_fetcher import NewsItem, fetch_headlines
+from src.notifier_telegram import send_telegram_messages
 
 
 def configure_logging() -> None:
@@ -15,6 +17,26 @@ def configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     )
+
+
+def load_env(path: Path) -> None:
+    """Load environment variables from a simple .env file without overriding existing values."""
+    if not path.exists():
+        return
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            for line in file:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if "=" not in stripped:
+                    continue
+                key, value = stripped.split("=", 1)
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).warning("Could not load .env file: %s", exc)
 
 
 def display_headlines(ticker: str, headlines: Iterable[NewsItem]) -> None:
@@ -103,6 +125,22 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         help="Override tickers defined in the configuration file.",
     )
+    parser.add_argument(
+        "--telegram",
+        action="store_true",
+        help="Enable sending messages to Telegram (requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID).",
+    )
+    parser.add_argument(
+        "--telegram-mode",
+        choices=["per_ticker", "combined"],
+        default="per_ticker",
+        help="Choose message grouping for Telegram alerts.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print Telegram messages without sending them.",
+    )
     return parser.parse_args()
 
 
@@ -110,6 +148,8 @@ def main() -> int:
     configure_logging()
     args = parse_args()
     logger = logging.getLogger(__name__)
+
+    load_env(Path(".env"))
 
     try:
         settings: BotSettings = load_settings(args.config)
@@ -126,6 +166,7 @@ def main() -> int:
     seen_titles = load_seen_titles(seen_file)
     total_new_items = 0
     total_filtered_out = 0
+    ticker_headlines: Dict[str, List[NewsItem]] = {}
 
     for ticker in settings.tickers:
         try:
@@ -137,12 +178,33 @@ def main() -> int:
 
             total_filtered_out += keyword_filtered + duplicate_filtered
             total_new_items += len(deduped_headlines)
+            ticker_headlines[ticker] = deduped_headlines
 
             display_headlines(ticker, deduped_headlines)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to fetch headlines for %s: %s", ticker, exc)
 
     save_seen_titles(seen_file, seen_titles)
+
+    if args.telegram:
+        token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+        if not token or not chat_id:
+            logger.error(
+                "Telegram enabled but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing."
+            )
+        else:
+            try:
+                send_telegram_messages(
+                    token,
+                    chat_id,
+                    ticker_headlines,
+                    mode=args.telegram_mode,
+                    headline_limit=settings.headline_limit,
+                    dry_run=args.dry_run,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Failed to send Telegram messages: %s", exc)
 
     print("\nTotal new items:", total_new_items)
     print("Total filtered out:", total_filtered_out)
