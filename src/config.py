@@ -1,6 +1,6 @@
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
@@ -12,6 +12,8 @@ class BotSettings:
     tickers: List[str]
     headline_limit: int = 5
     news_source: str = "Yahoo Finance RSS"
+    include_keywords: List[str] = field(default_factory=list)
+    exclude_keywords: List[str] = field(default_factory=list)
 
 
 def load_settings(config_path: Optional[Path] = None) -> BotSettings:
@@ -31,6 +33,8 @@ def load_settings(config_path: Optional[Path] = None) -> BotSettings:
 
     headline_limit = int(config.get("headline_limit", 5))
     news_source = config.get("news_source", "Yahoo Finance RSS")
+    include_keywords = config.get("include_keywords", [])
+    exclude_keywords = config.get("exclude_keywords", [])
 
     logger.debug(
         "Configuration loaded: %s tickers, headline_limit=%s, news_source=%s",
@@ -38,4 +42,10 @@ def load_settings(config_path: Optional[Path] = None) -> BotSettings:
         headline_limit,
         news_source,
     )
-    return BotSettings(tickers=tickers, headline_limit=headline_limit, news_source=news_source)
+    return BotSettings(
+        tickers=tickers,
+        headline_limit=headline_limit,
+        news_source=news_source,
+        include_keywords=include_keywords,
+        exclude_keywords=exclude_keywords,
+    )
