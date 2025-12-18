@@ -1,5 +1,22 @@
 {
-  "tickers": ["NVDA", "AAPL", "TSLA", "TSM", "MU"],
+  "tickers": ["TSM", "HOOD", "CRCL", "NVDA", "QQQ", "XLK", "BTC-USD", "ETH-USD"],
   "headline_limit": 5,
-  "news_source": "Yahoo Finance RSS"
+  "news_source": "Yahoo Finance RSS",
+  "include_keywords": [
+    "earnings",
+    "guidance",
+    "downgrade",
+    "upgrade",
+    "SEC",
+    "lawsuit",
+    "acquisition",
+    "M&A",
+    "tariff",
+    "China",
+    "Taiwan",
+    "AI",
+    "semiconductor",
+    "NVIDIA"
+  ],
+  "exclude_keywords": ["paid partner", "sponsored"]
 }
