@@ -1,0 +1,5 @@
+{
+  "tickers": ["NVDA", "AAPL", "TSLA", "TSM", "MU"],
+  "headline_limit": 5,
+  "news_source": "Yahoo Finance RSS"
+}
